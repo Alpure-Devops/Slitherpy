@@ -27,62 +27,63 @@ class Case:
             else:
                 self.Assert = assertion_object()
             self.name = name
-    
-    def _executeTest(self, name:str) -> _Results.TestResult:
-        def test_decorator(func) -> FunctionType:
-            def wrapper() -> Status:
-                test_obj = self.Test(name, self._assertion_class)
 
-                try:
-                    returned_from_test = func(test_obj)
-                except AssertionError as assert_exception:
-                    returned_from_test = Status("test-fail", assert_exception )
-                except Exception as exception:
-                    returned_from_test = Status("unexpected-error", exception)
+    def _renderTestResult_(self, name, returned_from_test, test_obj):
+        test_result = Case._Results.TestResult(test_name=name)
 
-                #* Format Test Results
-                test_result = Case._Results.TestResult(test_name=name)
+        if isinstance(returned_from_test, Status):
+            test_result.status_type = returned_from_test.getType()
+            test_result.status = returned_from_test
+        else:
+            test_result.status_type = "test-pass"
+            test_result.status = Status("test-pass", {})
 
-                if isinstance(returned_from_test, Status):
-                    test_result.status_type = returned_from_test.getType()
-                    test_result.status = returned_from_test
-                else:
-                    test_result.status_type = "test-pass"
-                    test_result.status = Status("test-pass", {})
+            if test_obj.Assert is None:
+                test_result.test_breakdown = []
+            else:
+                test_result.test_breakdown = test_obj.Assert.assert_status
+                
+                for assert_status in test_obj.Assert.assert_status:
+                    if assert_status == "fail":
+                        test_result.status_type = "test-fail"
+                        test_result.status = Status("test-fail", {})
+                        break
 
-                    if test_obj.Assert is None:
-                        test_result.test_breakdown = []
-                    else:
-                        test_result.test_breakdown = test_obj.Assert.assert_status
-                        
-                        for assert_status in test_obj.Assert.assert_status:
-                            if assert_status == "fail":
-                                test_result.status_type = "test-fail"
-                                test_result.status = Status("test-fail", {})
-                                break
+        return test_result
 
-                return test_result
-            return wrapper
-            
-        test_result = test_decorator(getattr(self.Tests, name))()
+    def _testWrapper_(self, func: FunctionType, name: str) -> FunctionType:
+        def wrapper() -> Status:
+            test_obj = self.Test(name, self._assertion_class)
+
+            try:
+                returned_from_test = func(test_obj)
+            except AssertionError as assert_exception:
+                returned_from_test = Status("test-fail", assert_exception )
+            except Exception as exception:
+                returned_from_test = Status("unexpected-error", exception)
+
+            return self._renderTestResult_(name, returned_from_test, test_obj)
+        return wrapper
+
+    def _executeTest_(self, name:str) -> _Results.TestResult:  
+        test_result = self._testWrapper_(getattr(self.Tests, name), name)()
         self.Result.tests.append(test_result)
         return test_result
 
-    def _fetchTests(self, cls, options):
+    def _fetchTests_(self, cls, options):
         return mapClass(cls, options)
 
-    def _initResult(self) -> _Results.CaseResult:
+    def _initResult_(self) -> _Results.CaseResult:
         return self._Results.CaseResult(
             case_name=self.__class__.__name__
         )
 
-    def __init__(self, assertion: Assertion=Assert) -> None:
+    def _initCase_(self, assertion: Assertion):
         #* Setup Case Result and Assertion Class
-        self.Result = self._initResult()
+        self.Result = self._initResult_()
         self._assertion_class = assertion
 
-        #* Fetch Tests
-        test_list = self._fetchTests(self.Tests, {
+        test_list = self._fetchTests_(self.Tests, {
             'ignore-attributes': True,
             'ignore-classes': True,
             'ignore-dunder': True,
@@ -91,11 +92,7 @@ class Case:
 
         #* Execute Iterate Through Tests
         for testname in test_list:
-            #* Execute Test
-            self._executeTest(testname)
+            self._executeTest_(testname)
 
-
-   
-    
-
-    
+    def __init__(self, assertion: Assertion=Assert) -> None:
+        self._initCase_(assertion)

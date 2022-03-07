@@ -1,41 +1,27 @@
 from .base import Case as BaseCase
-from ..assertion import Assert, Assertion
+from ..assertion import Assertion
 from ..utils import callMethodFromString
 
-from dataclasses import dataclass
-
 class Case(BaseCase):
-    class _Results(BaseCase._Results):
-        @dataclass
-        class CaseError:
-            pass
-
-    def _runDeclaration(self, name: str, *args, **kwargs):
+    def _runDeclaration_(self, name: str, *args, **kwargs):
         return callMethodFromString(self.Declarations, name, *args, **kwargs)
 
-    def __init__(self, assertion: Assertion=Assert) -> None:
+    def _initCase_(self, assertion: Assertion):
         #* Setup Case Result and Assertion Class
-        self.Result = self._initResult()
+        self.Result = self._initResult_()
         self._assertion_class = assertion
 
         #* Fetch Tests
-        test_list = self._fetchTests(self.Tests, {
+        test_list = self._fetchTests_(self.Tests, {
             'ignore-attributes': True,
             'ignore-classes': True,
             'ignore-dunder': True,
             'ignore-type': True
         })
 
-        self._runDeclaration('setup')
-
-        #* Execute Iterate Through Tests
+        self._runDeclaration_('setup')
         for testname in test_list:
-            self._runDeclaration('beforeTestRuns')
-
-            #* Execute Test
-            self._executeTest(testname)
-
-            self._runDeclaration('afterTestRuns')
-
-        self._runDeclaration('teardown')
-        
+            self._runDeclaration_('beforeTestRuns')
+            self._executeTest_ (testname)
+            self._runDeclaration_('afterTestRuns')
+        self._runDeclaration_('teardown')
